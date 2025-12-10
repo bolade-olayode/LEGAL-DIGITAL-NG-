@@ -260,7 +260,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ##  Acknowledgments
 
-- Nigerian Judiciary for public access to court judgments
 - Supabase for the amazing backend platform
 - Next.js team for the incredible framework
 - Vercel for hosting infrastructure
