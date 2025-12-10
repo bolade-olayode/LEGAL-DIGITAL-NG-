@@ -117,7 +117,7 @@ export default async function PostsPage({ searchParams }) {
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Browse Legal Cases
+            Browse Appelate Court Decisions
           </h1>
           <p className="text-gray-600">
             {hasActiveFilters 
