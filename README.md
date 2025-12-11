@@ -193,7 +193,7 @@ This project successfully migrated **9,248 legal cases** from WordPress to Supab
 - Dark Background: `#0A1628`
 
 **Typography:**
-- Font: Inter (system font)
+- Font: Montserrat (system font)
 - Headings: Bold, 2xl-4xl
 - Body: Regular, sm-base
 
@@ -218,7 +218,7 @@ This project successfully migrated **9,248 legal cases** from WordPress to Supab
 ### Phase 3: Authentication 
 - [ ] User registration/login
 - [ ] Subscription plans
-- [ ] User dashboard
+- [ ] User dashboard UI
 - [ ] Save favorite cases
 - [ ] Search history
 
