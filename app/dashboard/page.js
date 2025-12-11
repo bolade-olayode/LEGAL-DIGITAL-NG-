@@ -26,7 +26,7 @@ export default async function Dashboard() {
               {greeting}, <span className="capitalize">{username}</span>.
             </h1>
             <p className="text-blue-200 max-w-xl">
-              Ready to continue your research? You have access to <b>35,000+ Appellate Court Decisions </b>
+              Ready to continue your research? You have access to <b>35,000+ Appellate Court Judgements & Decisions </b>
             </p>
             
             <div className="mt-8 flex gap-4">
@@ -73,7 +73,7 @@ export default async function Dashboard() {
                </div>
                <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Active</span>
             </div>
-            <h3 className="text-xl font-bold text-gray-900">Gold Plan</h3>
+            <h3 className="text-xl font-bold text-gray-900">Gold Package</h3>
             <p className="text-sm text-gray-500 mt-1">Valid until Dec 2025</p>
          </div>
       </div>

@@ -14,7 +14,7 @@ export default async function DashboardLayout({ children }) {
   const emailInitial = user.email ? user.email[0].toUpperCase() : 'U';
 
   const menuItems = [
-    { name: 'Overview', href: '/dashboard', icon: '📊' },
+    { name: 'Profile Overview', href: '/dashboard', icon: '📊' },
     { name: 'Browse Cases', href: '/posts', icon: '⚖️' }, 
     { name: 'Saved Judgments', href: '/dashboard/saved', icon: '🔖' },
     { name: 'Recent History', href: '/dashboard/history', icon: '🕒' },
