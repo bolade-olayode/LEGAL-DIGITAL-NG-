@@ -185,7 +185,7 @@ This project successfully migrated **9,248 legal cases** from WordPress to Supab
 
 ---
 
-## 🎨 Design System
+## Design System
 
 **Brand Colors:**
 - Primary Blue: `#050298`
@@ -199,7 +199,7 @@ This project successfully migrated **9,248 legal cases** from WordPress to Supab
 
 ---
 
-## 🔮 Roadmap
+## Roadmap
 
 ### Phase 1: MVP 
 - [x] Database migration
