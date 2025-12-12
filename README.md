@@ -213,12 +213,12 @@ This project successfully migrated **9,248 legal cases** from WordPress to Supab
 - [ ] Search autocomplete
 - [ ] Browse by tags page
 - [ ] Browse by categories page
-- [ ] Enhanced homepage
+- [x] Enhanced homepage
 
 ### Phase 3: Authentication 
-- [ ] User registration/login
+- [x] User registration/login
 - [ ] Subscription plans
-- [ ] User dashboard UI
+- [x] User dashboard UI
 - [ ] Save favorite cases
 - [ ] Search history
 
