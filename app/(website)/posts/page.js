@@ -1,324 +1,171 @@
 import { supabase } from '@/lib/supabase'
+import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
-import CaseFilters from '../components/CaseFilters'
+import CaseFilters from '@/app/components/CaseFilters'
 
 const ITEMS_PER_PAGE = 20
 
-export default async function PostsPage({ searchParams }) {
+export default async function Posts({ searchParams }) {
+  // 1. CHECK ACCESS (Subscription Gate Logic)
+  // We check the user session server-side to show/hide the warning
+  const serverSupabase = await createClient()
+  const { data: { user } } = await serverSupabase.auth.getUser()
+
+  // 2. PREPARE PARAMETERS
+  // await searchParams is required in Next.js 15
   const params = await searchParams
-  const currentPage = parseInt(params?.page || '1')
-  const selectedYear = params?.year || ''
-  const selectedCategory = params?.category || ''
-  const selectedLetter = params?.letter || ''
-  
-  const offset = (currentPage - 1) * ITEMS_PER_PAGE
-  
-  // Start building the query
-  let caseIds = null
-  
-  // Handle category filtering
-  if (selectedCategory) {
-    const { data: categoryData } = await supabase
-      .from('categories')
-      .select('id')
-      .eq('slug', selectedCategory)
-      .single()
-    
-    if (categoryData) {
-      const { data: caseCategoryData } = await supabase
-        .from('case_categories')
-        .select('case_id')
-        .eq('category_id', categoryData.id)
-      
-      caseIds = caseCategoryData?.map(cc => cc.case_id) || []
-    }
-  }
-  
-  // Build main query
+  const page = parseInt(params.page) || 1
+  const year = params.year || 'All Years'
+  const court = params.category || 'All Courts'
+  const letter = params.letter || 'All Letters'
+
+
+  // 3. BUILD THE DATABASE QUERY
   let query = supabase
     .from('cases')
     .select(`
       id, 
       title, 
-      slug,
-      case_categories (
-        categories (id, name, slug)
-      ),
-      case_tags (
-        tags (id, name, slug)
-      )
+      slug, 
+      case_year, 
+      categories(name),
+      tags(name)
     `, { count: 'exact' })
-  
-  // Apply filters
-  if (caseIds !== null) {
-    query = query.in('id', caseIds)
-  }
-  
-  if (selectedYear) {
-    query = query.eq('case_year', parseInt(selectedYear))
-  }
-  
-  if (selectedLetter) {
-    query = query.eq('first_letter', selectedLetter)
-  }
-  
-  // Execute query
-  const { data: cases, error, count } = await query
-    .order('published_at', { ascending: false })
-    .range(offset, offset + ITEMS_PER_PAGE - 1)
-  
-  if (error) {
-    console.error('Error fetching cases:', error)
-    return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-6xl mx-auto">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Error Loading Cases</h1>
-          <pre className="bg-red-50 p-4 rounded text-sm overflow-auto">
-            {JSON.stringify(error, null, 2)}
-          </pre>
+    // CHANGE THIS LINE:
+    // Old: .order('case_year', { ascending: false }) 
+    // New: Order by title, A -> Z
+    .order('title', { ascending: true }) 
+    .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1)
+
+  // Apply filters if they are selected
+  if (year !== 'All Years') query = query.eq('case_year', year)
+  if (court !== 'All Courts') query = query.eq('categories.name', court)
+  if (letter !== 'All Letters') query = query.ilike('title', `${letter}%`)
+
+  const { data: posts, count } = await query
+  const totalPages = Math.ceil((count || 0) / ITEMS_PER_PAGE)
+
+  return (
+    <div className="min-h-screen bg-[#F8F9FA] font-montserrat pb-20">
+      
+      {/* 1. HEADER SECTION */}
+      <div className="bg-white border-b border-gray-200 py-8 px-4 sm:px-6 lg:px-8 mb-8">
+        <div className="max-w-7xl mx-auto">
+           <h1 className="text-3xl font-bold text-[#050298] mb-2">Browse Appellate Court Decisions</h1>
+           <p className="text-gray-500">
+             Accessing {count?.toLocaleString()} judgments from the database.
+           </p>
         </div>
       </div>
-    )
-  }
-  
-  // Fetch filter options
-  const { data: categories } = await supabase
-    .from('categories')
-    .select('id, name, slug')
-    .order('name')
-  
-  // Generate year and letter options
-  const currentYear = new Date().getFullYear()
-  const years = Array.from({ length: currentYear - 1899 }, (_, i) => currentYear - i)
-  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
-  
-  // Calculate pagination
-  const totalPages = Math.ceil((count || 0) / ITEMS_PER_PAGE)
-  const hasNextPage = currentPage < totalPages
-  const hasPrevPage = currentPage > 1
-  
-  // Build pagination URL
-  const buildPageUrl = (page) => {
-    const urlParams = new URLSearchParams()
-    if (selectedYear) urlParams.set('year', selectedYear)
-    if (selectedCategory) urlParams.set('category', selectedCategory)
-    if (selectedLetter) urlParams.set('letter', selectedLetter)
-    if (page > 1) urlParams.set('page', page.toString())
-    
-    const queryString = urlParams.toString()
-    return `/posts${queryString ? `?${queryString}` : ''}`
-  }
-  
-  const hasActiveFilters = selectedYear || selectedCategory || selectedLetter
-  
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Browse Appelate Court Decisions
-          </h1>
-          <p className="text-gray-600">
-            {hasActiveFilters 
-              ? `Found ${count?.toLocaleString() || 0} cases matching your filters`
-              : `Browse all ${count?.toLocaleString() || 0} cases in our database`
-            }
-          </p>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        {/* 2. FILTER WIDGET */}
+        <div className="mb-8">
+           <CaseFilters />
         </div>
-        
-        {/* Filters - Client Component */}
-        <CaseFilters 
-          categories={categories || []}
-          years={years}
-          letters={letters}
-        />
-        
-        {/* Cases List */}
-        {cases && cases.length > 0 ? (
-          <div className="space-y-4 mb-8">
-            {cases.map((caseItem) => {
-              const tags = caseItem.case_tags?.map(ct => ct.tags).filter(Boolean) || []
-              const itemCategories = caseItem.case_categories?.map(cc => cc.categories).filter(Boolean) || []
-              
-              return (
-                <Link
-                  key={caseItem.id}
-                  href={`/posts/${caseItem.slug}`}
-                  className="block bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition"
-                >
-                  <h2 className="text-xl font-semibold text-gray-900 mb-3">
-                    {caseItem.title}
-                  </h2>
-                  
-                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 text-sm">
-                    <div className="flex-1">
-                      {tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2 items-center">
-                          <span className="text-gray-600 font-medium">Tags:</span>
-                          {tags.slice(0, 3).map((tag) => (
-                            <span
-                              key={tag.id}
-                              className="bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs"
-                            >
-                              {tag.name}
-                            </span>
-                          ))}
-                          {tags.length > 3 && (
-                            <span className="text-gray-500 text-xs">
-                              +{tags.length - 3} more
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    
-                    {tags.length > 0 && itemCategories.length > 0 && (
-                      <div className="hidden md:block h-6 w-px bg-gray-300 mx-2"></div>
-                    )}
-                    
-                    <div className="flex-shrink-0">
-                      {itemCategories.length > 0 && (
-                        <div className="flex flex-wrap gap-2 items-center md:justify-end">
-                          <span className="text-gray-600 font-medium">Court:</span>
-                          {itemCategories.map((cat) => (
-                            <span
-                              key={cat.id}
-                              className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium"
-                            >
-                              {cat.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+
+        {/* 3. ACCESS WARNING (Shows only if NOT logged in) */}
+        {!user && (
+           <div className="bg-yellow-50 border-l-4 border-[#FFC107] p-4 mb-8 rounded-r-md">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-3">
+                   <span className="text-2xl">🔒</span>
+                   <p className="text-yellow-900 text-sm">
+                      <strong>Public Preview Mode:</strong> You are viewing a limited list. Log in to access full case documents and advanced search.
+                   </p>
+                </div>
+                <Link href="/login" className="px-4 py-2 bg-[#FFC107] text-blue-900 text-sm font-bold rounded shadow-sm hover:bg-yellow-400 transition-colors">
+                  Log In Now
                 </Link>
-              )
-            })}
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow-md p-12 text-center">
-            <svg className="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No cases found</h3>
-            <p className="text-gray-600 mb-6">Try adjusting your filters to find what you're looking for.</p>
-            <Link
-              href="/posts"
-              className="inline-block px-6 py-3 bg-[#050298] text-white rounded-lg hover:bg-[#0402c4] transition font-medium"
+              </div>
+           </div>
+        )}
+
+        {/* 4. RESULTS LIST */}
+        <div className="space-y-4">
+          {posts?.map((post) => (
+            <Link 
+              key={post.id} 
+              href={`/posts/${post.slug}`}
+              className="block bg-white rounded-lg border border-gray-200 p-6 shadow-sm hover:shadow-md hover:border-blue-300 transition-all group"
             >
-              View All Cases
+              {/* TITLE: Only render if title exists */}
+              {post.title && (
+                <h2 className="text-lg font-bold text-gray-800 uppercase mb-4 leading-snug group-hover:text-[#050298] transition-colors">
+                  {post.title}
+                </h2>
+              )}
+
+              <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-gray-50 mt-2">
+                 
+                 {/* LEFT: Tags (Gray Pills) - Only render if tags exist */}
+                 <div className="flex flex-wrap items-center gap-2">
+                    {post.tags && post.tags.length > 0 ? (
+                       <>
+                         <span className="text-xs font-bold text-gray-500 mr-1">Tags:</span>
+                         {post.tags.slice(0, 3).map((tag, i) => (
+                           <span key={i} className="px-3 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full border border-gray-200">
+                             {tag.name}
+                           </span>
+                         ))}
+                         {post.tags.length > 3 && (
+                            <span className="text-xs text-gray-400">+{post.tags.length - 3}</span>
+                         )}
+                       </>
+                    ) : (
+                       // Optional: You can remove this span if you want it completely empty
+                       <span className="text-xs text-gray-400 italic">Uncategorized</span>
+                    )}
+                 </div>
+
+                 {/* RIGHT: Court (Green Pills) & Year */}
+                 <div className="flex items-center gap-2">
+                    {/* Render Court Name if available */}
+                    {post.categories?.map((cat, i) => (
+                       <span key={i} className="px-3 py-1 bg-green-50 text-green-700 text-xs font-bold rounded-full border border-green-100 uppercase tracking-wider">
+                         {cat.name}
+                       </span>
+                    ))}
+                    
+                    {/* Render Year if available */}
+                    {post.case_year && (
+                       <span className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100">
+                         {post.case_year}
+                       </span>
+                    )}
+                 </div>
+
+              </div>
             </Link>
-          </div>
-        )}
-        
-        {/* Pagination */}
-        {cases && cases.length > 0 && totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 rounded-lg shadow">
-            <div className="flex flex-1 justify-between sm:hidden">
-              {hasPrevPage ? (
-                <Link
-                  href={buildPageUrl(currentPage - 1)}
-                  className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Previous
-                </Link>
-              ) : (
-                <span className="relative inline-flex items-center rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-400 cursor-not-allowed">
-                  Previous
-                </span>
-              )}
-              {hasNextPage ? (
-                <Link
-                  href={buildPageUrl(currentPage + 1)}
-                  className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Next
-                </Link>
-              ) : (
-                <span className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-400 cursor-not-allowed">
-                  Next
-                </span>
-              )}
-            </div>
-            
-            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700">
-                  Page <span className="font-medium">{currentPage}</span> of{' '}
-                  <span className="font-medium">{totalPages}</span>
-                </p>
-              </div>
-              <div>
-                <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm">
-                  {hasPrevPage ? (
-                    <Link
-                      href={buildPageUrl(currentPage - 1)}
-                      className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                    >
-                      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
-                      </svg>
-                    </Link>
-                  ) : (
-                    <span className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-300 ring-1 ring-inset ring-gray-300 cursor-not-allowed">
-                      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
-                      </svg>
-                    </span>
-                  )}
-                  
-                  {[...Array(Math.min(5, totalPages))].map((_, idx) => {
-                    let pageNum
-                    if (totalPages <= 5) {
-                      pageNum = idx + 1
-                    } else if (currentPage <= 3) {
-                      pageNum = idx + 1
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + idx
-                    } else {
-                      pageNum = currentPage - 2 + idx
-                    }
-                    
-                    const isCurrentPage = pageNum === currentPage
-                    
-                    return (
-                      <Link
-                        key={pageNum}
-                        href={buildPageUrl(pageNum)}
-                        className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
-                          isCurrentPage
-                            ? 'z-10 bg-[#050298] text-white'
-                            : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
-                        }`}
-                      >
-                        {pageNum}
-                      </Link>
-                    )
-                  })}
-                  
-                  {hasNextPage ? (
-                    <Link
-                      href={buildPageUrl(currentPage + 1)}
-                      className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                    >
-                      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
-                      </svg>
-                    </Link>
-                  ) : (
-                    <span className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-300 ring-1 ring-inset ring-gray-300 cursor-not-allowed">
-                      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
-                      </svg>
-                    </span>
-                  )}
-                </nav>
-              </div>
-            </div>
-          </div>
-        )}
+          ))}
+        </div>
+
+        {/* 5. PAGINATION */}
+        <div className="mt-12 flex justify-center gap-2">
+          {page > 1 && (
+            <Link 
+              href={`/posts?page=${page - 1}`} 
+              className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors"
+            >
+              &larr; Prev
+            </Link>
+          )}
+          
+          <span className="px-4 py-2 bg-[#050298] text-white rounded font-medium shadow-sm">
+             Page {page} of {totalPages}
+          </span>
+
+          {page < totalPages && (
+            <Link 
+              href={`/posts?page=${page + 1}`} 
+              className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors"
+            >
+              Next &rarr;
+            </Link>
+          )}
+        </div>
+
       </div>
     </div>
   )
